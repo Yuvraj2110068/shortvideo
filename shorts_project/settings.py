@@ -9,12 +9,18 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
+from dotenv import load_dotenv
+load_dotenv()
 
 from pathlib import Path
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+
+YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
 
 
 # Quick-start development settings - unsuitable for production
@@ -39,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'shorts_app',
+    'video_project', # Add this line
 ]
 
 MIDDLEWARE = [
@@ -160,8 +167,20 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
+
 MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = '/media/'
+
+# Ensure MEDIA directory exists
+# os.makedirs(MEDIA_ROOT, exist_ok=True)
+# os.makedirs(os.path.join(MEDIA_ROOT, 'project_images'), exist_ok=True)
+# os.makedirs(os.path.join(MEDIA_ROOT, 'project_audio'), exist_ok=True)
+# os.makedirs(os.path.join(MEDIA_ROOT, 'generated_projects'), exist_ok=True)
+# os.makedirs(os.path.join(MEDIA_ROOT, 'temp'), exist_ok=True) # For temporary files during video generation
+
 
 # API Key for Google Gemini
-GEMINI_API_KEY = "AIzaSyCok9ZDKb3uNRcz2nIQBCvzrWPlAhT2WTI"
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+# ... rest of the settings
 STATIC_ROOT = os.path.join(BASE_DIR, "static/")

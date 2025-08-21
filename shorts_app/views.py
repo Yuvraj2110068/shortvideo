@@ -1,3 +1,6 @@
+from PIL import Image
+if not hasattr(Image, "ANTIALIAS") and hasattr(Image, "Resampling"):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
 import os
 import uuid
 import json
@@ -12,11 +15,16 @@ from django.conf import settings
 from django.http import JsonResponse, FileResponse, Http404
 from django.core.cache import cache
 from yt_dlp import YoutubeDL
+
 from moviepy.editor import VideoFileClip, CompositeVideoClip, ColorClip
 from moviepy.video.fx.all import crop, resize
 
 from .models import DownloadedVideo, GeneratedShort
 import google.generativeai as genai
+
+# Import for YouTube Data API
+import googleapiclient.discovery
+import googleapiclient.errors
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +37,7 @@ try:
     else:
         logger.error("GEMINI_API_KEY not set. AI features disabled.")
 except Exception as e:
-    logger.error(f"Error during Gemini API configuration: {e}. AI features disabled.")
+    logger.error(f"Error during Gemini configuration: {e}. AI features disabled.")
     genai = None
 
 
@@ -214,6 +222,89 @@ def generate_short(request):
         return JsonResponse({'status': 'success', 'message': 'Short created successfully!'})
     except Exception as e:
         logger.error(f"Error during short generation: {e}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
+
+
+# --- New: YouTube Trending Videos API ---
+def get_trending_videos(request):
+    topic = request.GET.get('topic', '').strip()
+    page_token = request.GET.get('pageToken', '').strip() # New: Get pageToken from request
+    api_key = getattr(settings, 'YOUTUBE_API_KEY', None)
+
+    if not api_key:
+        logger.error("YOUTUBE_API_KEY is not set in settings.py")
+        return JsonResponse({'status': 'error', 'message': 'YouTube API key not configured.'}, status=500)
+
+    try:
+        youtube = googleapiclient.discovery.build("youtube", "v3", developerKey=api_key)
+        videos = []
+        next_page_token = None # Initialize next_page_token
+
+        if topic: # If a specific topic is provided, use search().list
+            # Parameters for search().list
+            search_request = youtube.search().list(
+                part='snippet',
+                q=topic,
+                type='video',
+                videoDefinition='high', # Request HD quality videos
+                maxResults=20,
+                order='date', # Order by date for new videos for a specific query
+                pageToken=page_token if page_token else None # Pass pageToken if available
+            )
+            search_response = search_request.execute()
+
+            for item in search_response.get('items', []):
+                if item['id']['kind'] == 'youtube#video':
+                    video_id = item['id']['videoId']
+                    title = item['snippet']['title']
+                    thumbnail_url = item['snippet']['thumbnails'].get('high', {}).get('url') or \
+                                    item['snippet']['thumbnails'].get('medium', {}).get('url') or \
+                                    item['snippet']['thumbnails'].get('default', {}).get('url')
+                    video_url = f"https://www.youtube.com/watch?v={video_id}"
+                    videos.append({
+                        'video_id': video_id,
+                        'title': title,
+                        'thumbnail_url': thumbnail_url,
+                        'video_url': video_url,
+                    })
+            next_page_token = search_response.get('nextPageToken') # Get next page token
+
+        else: # If no specific topic, fetch most popular videos using videos().list
+            # Parameters for videos().list (for general trending/most popular)
+            # Note: videos.list(chart='mostPopular') does not support 'order' or 'q'
+            # and its pagination uses 'pageToken' directly.
+            popular_request = youtube.videos().list(
+                part='snippet',
+                chart='mostPopular',
+                regionCode='US', # Default to US trending, adjust as needed
+                maxResults=20,
+                pageToken=page_token if page_token else None # Pass pageToken if available
+            )
+            popular_response = popular_request.execute()
+
+            for item in popular_response.get('items', []):
+                video_id = item['id'] # For videos.list, video ID is directly in 'id'
+                title = item['snippet']['title']
+                thumbnail_url = item['snippet']['thumbnails'].get('high', {}).get('url') or \
+                                item['snippet']['thumbnails'].get('medium', {}).get('url') or \
+                                item['snippet']['thumbnails'].get('default', {}).get('url')
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                videos.append({
+                    'video_id': video_id,
+                    'title': title,
+                    'thumbnail_url': thumbnail_url,
+                    'video_url': video_url,
+                })
+            next_page_token = popular_response.get('nextPageToken') # Get next page token
+
+        return JsonResponse({'status': 'success', 'videos': videos, 'nextPageToken': next_page_token})
+
+    except googleapiclient.errors.HttpError as e:
+        error_message = f"YouTube API error: {e.resp.status} - {e.content.decode('utf-8')}"
+        logger.error(error_message)
+        return JsonResponse({'status': 'error', 'message': error_message}, status=e.resp.status)
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while fetching trending videos: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
 
 

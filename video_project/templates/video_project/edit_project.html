@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Project: {{ project.title }}</title>
+    {% comment %} Keep existing styles and fonts {% endcomment %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6a11cb;
+            --primary-gradient: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            --primary-hover: #2575fc;
+            --secondary-color: #495057;
+            --danger-color: #e63946;
+            --success-color: #2a9d8f;
+            --light-gray: #f8f9fa;
+            --medium-gray: #e9ecef;
+            --dark-gray: #343a40;
+            --text-color: #212529;
+            --background-color: #f0f2f5;
+            --border-radius: 12px;
+            --box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+            --transition-speed: 0.3s;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: auto; padding: 2rem; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding: 1.5rem 0; }
+        .header__title { font-family: 'Poppins', sans-serif; font-size: 2.5rem; font-weight: 700; color: var(--dark-gray); margin: 0; }
+        .header__title span { background: var(--primary-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        h2 { font-family: 'Poppins', sans-serif; font-weight: 600; border-bottom: 2px solid var(--medium-gray); padding-bottom: 10px; margin-bottom: 1.5rem; color: var(--dark-gray); }
+        .card { background: #ffffff; padding: 2rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); margin-bottom: 2.5rem; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 14px 24px; border: none; color: white; font-size: 1rem; font-weight: 600; flex-shrink: 0; border-radius: var(--border-radius); cursor: pointer; text-decoration: none; transition: all var(--transition-speed) ease; }
+        .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .btn:disabled { background-color: #a0a0a0; cursor: not-allowed; opacity: 0.7; transform: none; box-shadow: none; }
+        .btn-primary { background: var(--primary-gradient); }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+        .btn-secondary { background-color: var(--secondary-color); }
+        .btn-danger { background-color: var(--danger-color); }
+        .btn-outline { background: none; border: 1px solid var(--primary-color); color: var(--primary-color); }
+        .btn-outline:hover:not(:disabled) { background: var(--primary-color); color: white; }
+        .image-upload-area { border: 2px dashed var(--medium-gray); border-radius: var(--border-radius); padding: 2rem; text-align: center; cursor: pointer; transition: border-color 0.3s ease; }
+        .image-upload-area:hover { border-color: var(--primary-color); }
+        .image-upload-area input[type="file"] { display: none; }
+        .image-list { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; min-height: 100px; border: 1px solid var(--medium-gray); border-radius: var(--border-radius); padding: 1rem; background-color: var(--light-gray); }
+        .image-item { position: relative; border: 1px solid #ccc; border-radius: 8px; overflow: hidden; width: 150px; height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: grab; }
+        .image-item img { max-width: 100%; max-height: calc(100% - 40px); object-fit: contain; display: block; }
+        .image-item input[type="number"] { width: calc(100% - 20px); margin-top: 5px; padding: 5px; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 0.85rem; }
+        .image-item .remove-image-btn { position: absolute; top: 5px; right: 5px; background: var(--danger-color); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.8; transition: opacity 0.2s ease; }
+        .image-item .remove-image-btn:hover { opacity: 1; }
+        .image-item .order-label { position: absolute; top: 5px; left: 5px; background-color: rgba(0,0,0,0.5); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+        .text-overlay-item { background: var(--light-gray); border: 1px solid var(--medium-gray); border-radius: var(--border-radius); padding: 1rem; margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: center; }
+        .text-overlay-item textarea { grid-column: 1 / -1; width: calc(100% - 20px); padding: 10px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.9rem; min-height: 60px; resize: vertical; }
+        .text-overlay-item input, .text-overlay-item select { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box; }
+        .text-overlay-item .remove-text-btn { grid-column: 1 / -1; width: fit-content; margin-left: auto; padding: 8px 15px; font-size: 0.9rem; }
+        .add-text-btn { margin-top: 1rem; }
+        .audio-section { display: flex; gap: 1rem; align-items: center; }
+        .audio-section input[type="file"] { flex-grow: 1; }
+        .audio-section audio { flex-grow: 1; width: 100%; max-width: 400px; }
+        .audio-section .remove-audio-btn { padding: 8px 15px; font-size: 0.9rem; }
+        .progress-indicator { display: none; margin-top: 1.5rem; }
+        .progress-text { font-weight: 500; color: var(--dark-gray); margin-bottom: 0.5rem; }
+        .progress-bar-bg { width: 100%; background: var(--medium-gray); border-radius: 8px; overflow: hidden; height: 12px; }
+        .progress-bar-fill { width: 0%; height: 100%; background: var(--primary-gradient); transition: width 0.4s ease; }
+        .spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s linear infinite; }
+        .btn.loading .spinner { display: block; }
+        .btn.loading .btn-text { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .final-video-preview { margin-top: 1.5rem; text-align: center; }
+        .final-video-preview video { max-width: 100%; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
+        .final-video-preview .btn-group { margin-top: 1rem; display: flex; justify-content: center; gap: 1rem; }
+        .ai-caption-area { margin-top: 1rem; padding: 1rem; background-color: var(--light-gray); border-radius: var(--border-radius); border: 1px solid var(--medium-gray); }
+        .ai-caption-area textarea { width: calc(100% - 20px); min-height: 80px; padding: 10px; border: 1px solid #ced4da; border-radius: 8px; font-size: 0.9rem; margin-bottom: 10px; resize: vertical; }
+        .ai-caption-results { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .ai-caption-result-item { background-color: #fff; padding: 0.75rem; border-radius: 8px; border: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+        .ai-caption-result-item .apply-caption-btn { padding: 5px 10px; font-size: 0.8rem; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="header__title">Edit Project: <span>{{ project.title }}</span></h1>
+            <a href="{% url 'video_project:project_list' %}" class="btn btn-secondary">Back to Projects</a>
+        </header>
+
+        {% csrf_token %}
+
+        <div class="card">
+            <h2>1. Manage Images</h2>
+            <div class="image-upload-area" id="image-upload-area">
+                <p>Drag & Drop Images Here or Click to Upload</p>
+                <input type="file" id="image-upload-input" accept="image/*" multiple>
+            </div>
+            <div class="image-list" id="image-list">
+                <p style="text-align: center; width: 100%; color: #6c757d;">Loading images...</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>2. Add Text Overlays</h2>
+            <div id="text-overlays-container"></div>
+            <button type="button" id="add-text-btn" class="add-text-btn btn btn-outline">Add Text Overlay</button>
+
+            <div class="ai-caption-area">
+                <h3>AI Caption Suggestions (Gemini)</h3>
+                <p>Describe your images to get caption ideas.</p>
+                <textarea id="ai-image-descriptions" placeholder="e.g., A dog playing in a park, A cat sleeping on a couch, A beautiful sunset over the ocean"></textarea>
+                <button type="button" id="get-ai-captions-btn" class="btn btn-primary"><span class="btn-text">Get AI Captions</span><div class="spinner"></div></button>
+                <div id="ai-caption-results" class="ai-caption-results"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>3. Add Audio</h2>
+            <div class="audio-section">
+                <input type="file" id="audio-upload-input" accept="audio/*">
+                <audio id="current-audio-preview" controls style="display: none;"></audio>
+                <button type="button" id="remove-audio-btn" class="btn btn-danger" style="display: none;">Remove Audio</button>
+                <p id="no-audio-text" style="color: #6c757d;">No audio uploaded yet.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>4. Generate Video</h2>
+            <button type="button" id="generate-video-btn" class="btn btn-primary">
+                <span class="btn-text">Generate Video</span><div class="spinner"></div>
+            </button>
+            <div id="generation-progress" class="progress-indicator">
+                <p id="generation-progress-text" class="progress-text"></p>
+                <div class="progress-bar-bg"><div id="generation-progress-bar" class="progress-bar-fill"></div></div>
+            </div>
+
+            <div id="final-video-section">
+                {% if project.final_video_path %}
+                <div class="final-video-preview">
+                    <h3>Preview Your Video</h3>
+                    <video controls src="{{ project.final_video_path }}" poster="{{ project.thumbnail_path }}"></video>
+                    <div class="btn-group">
+                        <a href="{% url 'video_project:download_video' project.id %}" class="btn btn-secondary">Download Video</a>
+                    </div>
+                </div>
+                {% elif project.status == 'failed' %}
+                <div class="final-video-preview" style="color: var(--danger-color);">
+                    <h3>Video Generation Failed!</h3>
+                    <p>{{ project.message }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- **** IMPORTANT FIX: Pass data from Django to JavaScript **** -->
+    {{ project.image_data|json_script:"image_data_json" }}
+    {{ project.text_overlays|json_script:"text_overlays_json" }}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- State & Initial Data ---
+            const projectId = "{{ project.id }}";
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            // Correctly parse data from the <script> tags added above
+            let imageData = JSON.parse(document.getElementById('image_data_json').textContent || '[]');
+            let textOverlays = JSON.parse(document.getElementById('text_overlays_json').textContent || '[]');
+            let audioPath = "{{ project.audio_path|default:'' }}";
+            const initialProjectStatus = "{{ project.status }}";
+
+            // --- DOM Elements ---
+            const imageUploadArea = document.getElementById('image-upload-area');
+            const imageUploadInput = document.getElementById('image-upload-input');
+            const imageList = document.getElementById('image-list');
+            const textOverlaysContainer = document.getElementById('text-overlays-container');
+            const addTextBtn = document.getElementById('add-text-btn');
+            const audioUploadInput = document.getElementById('audio-upload-input');
+            const currentAudioPreview = document.getElementById('current-audio-preview');
+            const removeAudioBtn = document.getElementById('remove-audio-btn');
+            const noAudioText = document.getElementById('no-audio-text');
+            const generateVideoBtn = document.getElementById('generate-video-btn');
+            const getAiCaptionsBtn = document.getElementById('get-ai-captions-btn');
+            const aiImageDescriptionsInput = document.getElementById('ai-image-descriptions');
+            const aiCaptionResultsDiv = document.getElementById('ai-caption-results');
+
+            let generationProgressInterval;
+
+            // --- Utility Functions ---
+            const toggleButtonLoading = (button, isLoading) => {
+                if (!button) return;
+                button.disabled = isLoading;
+                button.classList.toggle('loading', isLoading);
+            };
+
+            const showProgress = (show, text = '', percentage = 0) => {
+                const container = document.getElementById('generation-progress');
+                const textElem = document.getElementById('generation-progress-text');
+                const barElem = document.getElementById('generation-progress-bar');
+                if (!container || !textElem || !barElem) return;
+
+                if (show) {
+                    textElem.textContent = text;
+                    barElem.style.width = `${percentage}%`;
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                }
+            };
+            
+            const displayMessage = (message, type = 'info') => {
+                // Simple alert for now, can be replaced with a custom modal
+                alert(`[${type.toUpperCase()}] ${message}`);
+            };
+
+            const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+
+            // --- Image Management ---
+            const renderImages = () => {
+                imageList.innerHTML = '';
+                if (imageData.length === 0) {
+                    imageList.innerHTML = '<p style="text-align: center; width: 100%; color: #6c757d;">No images uploaded yet.</p>';
+                    return;
+                }
+                imageData.forEach((img, index) => {
+                    const imgItem = document.createElement('div');
+                    imgItem.className = 'image-item';
+                    imgItem.dataset.id = img.id;
+                    imgItem.innerHTML = `
+                        <span class="order-label">${index + 1}</span>
+                        <img src="${img.image_path}" alt="Image thumbnail">
+                        <input type="number" class="image-duration-input" value="${img.duration}" min="1" max="60" title="Duration (seconds)">
+                        <button type="button" class="remove-image-btn" title="Remove image">&times;</button>
+                    `;
+                    imageList.appendChild(imgItem);
+                });
+                attachImageEventListeners();
+            };
+
+            const attachImageEventListeners = () => {
+                imageList.querySelectorAll('.remove-image-btn').forEach(button => {
+                    button.onclick = e => {
+                        const idToRemove = e.target.closest('.image-item').dataset.id;
+                        imageData = imageData.filter(img => img.id !== idToRemove);
+                        renderImages();
+                    };
+                });
+                imageList.querySelectorAll('.image-duration-input').forEach(input => {
+                    input.onchange = e => {
+                        const idToUpdate = e.target.closest('.image-item').dataset.id;
+                        const newDuration = parseInt(e.target.value, 10);
+                        const imgIndex = imageData.findIndex(img => img.id === idToUpdate);
+                        if (imgIndex !== -1 && !isNaN(newDuration) && newDuration >= 1) {
+                            imageData[imgIndex].duration = newDuration;
+                        } else {
+                            e.target.value = imageData[imgIndex].duration;
+                            displayMessage("Duration must be a positive number.", 'error');
+                        }
+                    };
+                });
+            };
+
+            const handleImageFiles = async (files) => {
+                for (const file of files) {
+                    if (!file.type.startsWith('image/')) continue;
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    formData.append('project_id', projectId);
+
+                    try {
+                        const response = await fetch("{% url 'video_project:upload_image' %}", {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken },
+                            body: formData
+                        });
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            imageData.push(data.image_info);
+                            renderImages();
+                        } else {
+                            displayMessage(`Upload failed: ${data.message}`, 'error');
+                        }
+                    } catch (error) {
+                        displayMessage(`Upload error: ${error.message}`, 'error');
+                    }
+                }
+            };
+
+            Sortable.create(imageList, {
+                animation: 150,
+                onEnd: evt => {
+                    const [movedItem] = imageData.splice(evt.oldIndex, 1);
+                    imageData.splice(evt.newIndex, 0, movedItem);
+                    renderImages();
+                }
+            });
+
+            imageUploadArea.onclick = () => imageUploadInput.click();
+            imageUploadArea.ondragover = e => { e.preventDefault(); imageUploadArea.style.borderColor = 'var(--primary-color)'; };
+            imageUploadArea.ondragleave = () => imageUploadArea.style.borderColor = 'var(--medium-gray)';
+            imageUploadArea.ondrop = e => {
+                e.preventDefault();
+                imageUploadArea.style.borderColor = 'var(--medium-gray)';
+                handleImageFiles(e.dataTransfer.files);
+            };
+            imageUploadInput.onchange = e => handleImageFiles(e.target.files);
+
+            // --- Text Overlay Management ---
+            const renderTextOverlays = () => {
+                textOverlaysContainer.innerHTML = '';
+                textOverlays.forEach(overlay => {
+                    const item = document.createElement('div');
+                    item.className = 'text-overlay-item';
+                    item.dataset.id = overlay.id;
+                    item.innerHTML = `
+                        <textarea data-key="text" placeholder="Your text here">${overlay.text}</textarea>
+                        <input type="text" data-key="start_time" placeholder="Start (MM:SS)" value="${overlay.start_time}">
+                        <input type="text" data-key="end_time" placeholder="End (MM:SS)" value="${overlay.end_time}">
+                        <input type="text" data-key="font" placeholder="Font (e.g., Arial)" value="${overlay.font}">
+                        <input type="number" data-key="font_size" placeholder="Size" value="${overlay.font_size}">
+                        <input type="color" data-key="color" value="${overlay.color}">
+                        <select data-key="position">
+                            <option value="center" ${overlay.position === 'center' ? 'selected' : ''}>Center</option>
+                            <option value="top" ${overlay.position === 'top' ? 'selected' : ''}>Top</option>
+                            <option value="bottom" ${overlay.position === 'bottom' ? 'selected' : ''}>Bottom</option>
+                        </select>
+                        <button type="button" class="remove-text-btn btn btn-danger">Remove</button>
+                    `;
+                    textOverlaysContainer.appendChild(item);
+                });
+                attachTextOverlayEventListeners();
+            };
+
+            const attachTextOverlayEventListeners = () => {
+                textOverlaysContainer.querySelectorAll('.remove-text-btn').forEach(button => {
+                    button.onclick = e => {
+                        const id = e.target.closest('.text-overlay-item').dataset.id;
+                        textOverlays = textOverlays.filter(item => item.id !== id);
+                        renderTextOverlays();
+                    };
+                });
+                textOverlaysContainer.querySelectorAll('textarea, input, select').forEach(input => {
+                    input.onchange = e => {
+                        const id = e.target.closest('.text-overlay-item').dataset.id;
+                        const key = e.target.dataset.key;
+                        const value = e.target.value;
+                        const itemIndex = textOverlays.findIndex(item => item.id === id);
+                        if (itemIndex !== -1) {
+                            textOverlays[itemIndex][key] = key === 'font_size' ? parseInt(value, 10) : value;
+                        }
+                    };
+                });
+            };
+
+            addTextBtn.onclick = () => {
+                textOverlays.push({
+                    id: uuidv4(), text: 'Your Caption', start_time: '00:00', end_time: '00:05',
+                    font: 'Arial', font_size: 70, color: '#FFFFFF', position: 'center'
+                });
+                renderTextOverlays();
+            };
+            
+            // --- Audio Management ---
+            const initializeAudioPreview = () => {
+                if (audioPath) {
+                    currentAudioPreview.src = audioPath;
+                    currentAudioPreview.style.display = 'block';
+                    removeAudioBtn.style.display = 'inline-flex';
+                    noAudioText.style.display = 'none';
+                } else {
+                    currentAudioPreview.src = '';
+                    currentAudioPreview.style.display = 'none';
+                    removeAudioBtn.style.display = 'none';
+                    noAudioText.style.display = 'block';
+                }
+            };
+            
+            // NOTE: Audio upload is not implemented on the backend in the provided files.
+            // This JS will allow preview, but the path won't be saved without a backend view.
+            audioUploadInput.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                audioPath = URL.createObjectURL(file); // For client-side preview
+                initializeAudioPreview();
+                displayMessage("Audio selected for client-side preview. Backend upload is not implemented.", 'info');
+            };
+
+            removeAudioBtn.onclick = () => {
+                audioPath = '';
+                audioUploadInput.value = '';
+                initializeAudioPreview();
+            };
+
+            // --- AI & Video Generation ---
+            const checkGenerationProgress = () => {
+                fetch(`{% url 'video_project:check_generation_progress' project.id %}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data) return;
+                        showProgress(true, data.message, data.progress);
+                        if (data.status === 'complete' || data.status === 'error') {
+                            clearInterval(generationProgressInterval);
+                            toggleButtonLoading(generateVideoBtn, false);
+                            if (data.status === 'complete') {
+                                displayMessage('Video generated! Page will reload.', 'success');
+                                setTimeout(() => window.location.reload(), 1500);
+                            } else {
+                                displayMessage(`Generation failed: ${data.message}`, 'error');
+                            }
+                        }
+                    }).catch(error => {
+                        clearInterval(generationProgressInterval);
+                        toggleButtonLoading(generateVideoBtn, false);
+                        displayMessage('Could not check progress.', 'error');
+                    });
+            };
+
+            generateVideoBtn.onclick = async () => {
+                if (imageData.length === 0) {
+                    displayMessage('Please upload at least one image.', 'info');
+                    return;
+                }
+                toggleButtonLoading(generateVideoBtn, true);
+                showProgress(true, 'Starting video generation...', 0);
+
+                const payload = {
+                    image_data: imageData.map((img, index) => ({ ...img, order: index })),
+                    text_overlays: textOverlays,
+                    audio_path: audioPath.startsWith('blob:') ? null : audioPath // Don't send blob URLs
+                };
+
+                try {
+                    const response = await fetch(`{% url 'video_project:generate_video' project.id %}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (data.status === 'processing') {
+                        generationProgressInterval = setInterval(checkGenerationProgress, 2500);
+                    } else {
+                        throw new Error(data.message || 'Failed to start generation.');
+                    }
+                } catch (error) {
+                    displayMessage(`Error: ${error.message}`, 'error');
+                    toggleButtonLoading(generateVideoBtn, false);
+                    showProgress(false);
+                }
+            };
+            
+            getAiCaptionsBtn.onclick = async () => {
+                const descriptions = aiImageDescriptionsInput.value.trim();
+                if (!descriptions) {
+                    displayMessage('Please describe your images first.', 'info');
+                    return;
+                }
+                toggleButtonLoading(getAiCaptionsBtn, true);
+                aiCaptionResultsDiv.innerHTML = '<p>Generating captions...</p>';
+                try {
+                    const response = await fetch("{% url 'video_project:ai_caption_suggestion' %}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: JSON.stringify({ image_descriptions: descriptions.split(/[,\n]/).map(d => d.trim()).filter(Boolean) })
+                    });
+                    const data = await response.json();
+                    aiCaptionResultsDiv.innerHTML = '';
+                    if (data.status === 'success') {
+                        data.captions.forEach((caption, index) => {
+                            const item = document.createElement('div');
+                            item.className = 'ai-caption-result-item';
+                            item.innerHTML = `<span>${caption}</span><button class="apply-caption-btn btn btn-outline">Apply</button>`;
+                            item.querySelector('button').onclick = () => {
+                                textOverlays.push({
+                                    id: uuidv4(), text: caption, start_time: '00:00', end_time: '00:05',
+                                    font: 'Arial', font_size: 70, color: '#FFFFFF', position: 'center'
+                                });
+                                renderTextOverlays();
+                            };
+                            aiCaptionResultsDiv.appendChild(item);
+                        });
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } catch (error) {
+                    aiCaptionResultsDiv.innerHTML = `<p style="color:var(--danger-color)">Error: ${error.message}</p>`;
+                } finally {
+                    toggleButtonLoading(getAiCaptionsBtn, false);
+                }
+            };
+
+            // --- Initial Page Load ---
+            renderImages();
+            renderTextOverlays();
+            initializeAudioPreview();
+
+            if (initialProjectStatus === 'generating') {
+                toggleButtonLoading(generateVideoBtn, true);
+                generationProgressInterval = setInterval(checkGenerationProgress, 2500);
+            }
+        });
+    </script>
+</body>
+</html>

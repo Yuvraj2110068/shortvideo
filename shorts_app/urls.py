@@ -20,4 +20,7 @@ urlpatterns = [
     # Deletion URLs
     path('delete_video/<str:video_id>/', views.delete_video, name='delete_video'),
     path('delete_short/<uuid:short_id>/', views.delete_short, name='delete_short'),
+
+    # New: Trending Videos API
+    path('get_trending_videos/', views.get_trending_videos, name='get_trending_videos'),
 ]

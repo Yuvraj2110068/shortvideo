@@ -1,0 +1,100 @@
+<!-- video_project/templates/video_project/create_project.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Video Project</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6a11cb;
+            --primary-gradient: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            --primary-hover: #2575fc;
+            --secondary-color: #495057;
+            --danger-color: #e63946;
+            --light-gray: #f8f9fa;
+            --medium-gray: #e9ecef;
+            --dark-gray: #343a40;
+            --text-color: #212529;
+            --background-color: #f0f2f5;
+            --border-radius: 12px;
+            --box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+            --transition-speed: 0.3s;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: #ffffff;
+            padding: 3rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        h2 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            color: var(--dark-gray);
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+        .form-group input[type="text"] {
+            width: calc(100% - 28px);
+            padding: 14px 18px;
+            border: 1px solid #ced4da;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
+        }
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.15);
+        }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 14px 24px;
+            border: none; color: white; font-size: 1rem; font-weight: 600; flex-shrink: 0;
+            border-radius: var(--border-radius); cursor: pointer; text-decoration: none; transition: all var(--transition-speed) ease;
+            width: 100%;
+        }
+        .btn-primary { background: var(--primary-gradient); }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Create New Video Project</h2>
+        <form action="{% url 'video_project:create_project' %}" method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="title">Project Title (Optional)</label>
+                <input type="text" id="title" name="title" placeholder="e.g., My Awesome Vacation Video">
+            </div>
+            <button type="submit" class="btn btn-primary">Start Project</button>
+        </form>
+    </div>
+</body>
+</html>
