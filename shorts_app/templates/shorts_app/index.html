@@ -212,6 +212,44 @@
         .topic-buttons-container .btn-refresh:hover {
             background-color: #5a6268;
         }
+        /* ... at the end of your existing <style> tag ... */
+        .social-post-section {
+            margin-bottom: 1.5rem;
+            position: relative;
+            border: 1px solid var(--medium-gray);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .social-post-section strong {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        .copyable-text {
+            background-color: var(--light-gray);
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            color: var(--dark-gray);
+            word-wrap: break-word;
+        }
+        .btn-copy {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color var(--transition-speed);
+        }
+        .btn-copy:hover {
+            background-color: var(--dark-gray);
+        }
 
     </style>
 </head>
@@ -330,6 +368,7 @@
 <script>
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     let progressInterval;
+    let generationInterval;
 
     function toggleButtonLoading(button, isLoading) {
         if (!button) return;

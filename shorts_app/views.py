@@ -41,38 +41,81 @@ except Exception as e:
     genai = None
 
 
-# --- AI Suggestion, Get YouTube ID, Index, Check Progress (Unchanged) ---
-def get_ai_suggested_clips(transcript: str, video_duration: int):
-    # This function remains unchanged
-    if not genai_configured or not genai: return []
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    prompt = f"""
-    You are an expert video editor and viral content strategist.
-    Analyze the following transcript (total video duration: {video_duration} seconds) and identify up to 3 compelling segments for short videos (30-90 seconds).
-    For each clip, provide:
-    1.  `start_time`: In "MM:SS" format.
-    2.  `end_time`: In "MM:SS" format.
-    3.  `title`: A catchy, SEO-friendly title for the short video.
-    4.  `description`: A brief, engaging description, including a call-to-action if appropriate.
-    5.  `tags`: A JSON array of 5-7 relevant SEO keywords (strings).
-    6.  `copyright_concern`: A boolean (true/false). Set to true if the text suggests copyrighted material.
-    Your response MUST be a valid JSON array of objects. If no suitable clips are found, return an empty array [].
+# In shorts_app/views.py
+
+# ... (other imports)
+
+def get_ai_suggested_clips(transcript: str, video_duration: int, video_title: str): # <--- ADD video_title HERE
     """
-    try:
-        response = model.generate_content(prompt)
-        json_response_text = response.text.strip().replace("```json", "").replace("```", "")
-        raw_clips = json.loads(json_response_text)
-        return [c for c in raw_clips if isinstance(c, dict) and all(k in c for k in ['start_time', 'title', 'tags'])]
-    except Exception as e:
-        logger.error(f"Error calling Gemini API: {e}", exc_info=True)
+    Analyzes a video transcript to suggest relevant, contextual clips for shorts.
+    """
+    if not genai_configured or not genai:
+        logger.warning("Gemini AI not configured. Cannot generate clip suggestions.")
         return []
 
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    # --- NEW, IMPROVED PROMPT ---
+    prompt = f"""
+    You are a professional video editor specializing in creating insightful, shareable clips from long-form content.
+
+    **Video Context:**
+    - **Original Title:** "{video_title}"
+    - **Total Duration:** {video_duration} seconds
+
+    **Your Task:**
+    Analyze the provided transcript and identify up to 3 of the most compelling and thematically relevant segments to turn into short videos (30-90 seconds each). The suggestions MUST be directly related to the video's main topic as indicated by its title. Do not invent unrelated or generic viral ideas.
+
+    For each identified segment, provide the following in a JSON object:
+    1.  `start_time`: The precise start time in "MM:SS" format.
+    2.  `end_time`: The precise end time in "MM:SS" format.
+    3.  `title`: A concise and descriptive title that accurately reflects the content of that specific clip. The title MUST be relevant to the original video's subject.
+    4.  `description`: A brief summary of the clip's content.
+    5.  `tags`: A JSON array of 5-7 relevant keywords derived directly from the clip's content.
+    6.  `copyright_concern`: A boolean (true/false). Set to true only if the transcript explicitly mentions copyrighted material (e.g., movie clips, music).
+
+    **Transcript to Analyze:**
+    ---
+    {transcript}
+    ---
+
+    Your final output MUST be a valid JSON array of objects. If no suitable clips are found, return an empty array [].
+    """
+
+    try:
+        # Generate content with the new, detailed prompt
+        response = model.generate_content(prompt)
+
+        # Clean the response to ensure it's valid JSON
+        json_response_text = response.text.strip().replace("```json", "").replace("```", "")
+
+        # Load the JSON data
+        raw_clips = json.loads(json_response_text)
+
+        # Basic validation to ensure we have a list of dictionaries with the required keys
+        if isinstance(raw_clips, list):
+            return [
+                c for c in raw_clips
+                if isinstance(c, dict) and all(k in c for k in ['start_time', 'end_time', 'title', 'description', 'tags'])
+            ]
+        else:
+            logger.error(f"AI response was not a JSON list as expected. Received: {raw_clips}")
+            return []
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON from Gemini API response: {e}\nResponse text was: {json_response_text}")
+        return []
+    except Exception as e:
+        logger.error(f"An unexpected error occurred calling Gemini API: {e}", exc_info=True)
+        return []
+
+# ... (rest of the file is the same until the process_video function)
 
 def get_youtube_id(url):
     # This function remains unchanged
     if not url: return None
     query = urlparse(url)
-    if query.hostname in ('www.youtube.com', 'youtube.com'):
+    if query.hostname in ('youtu.be', 'www.youtube.com', 'youtube.com'):
         if query.path == '/watch': return parse_qs(query.query).get('v', [None])[0]
         if query.path.startswith(('/embed/', '/v/')): return query.path.split('/')[2]
     if query.hostname == 'youtu.be': return query.path[1:]
@@ -89,20 +132,21 @@ def check_progress(request, task_id):
     return JsonResponse(cache.get(task_id, {"status": "PENDING", "progress": 0, "message": "Initializing..."}))
 
 
+# --- Full, Updated process_video Function ---
 def process_video(request):
-    if request.method != 'POST': return JsonResponse({'status': 'error', 'message': 'Invalid request.'})
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid request.'})
 
     video_url = request.POST.get('video_url')
     video_id = request.POST.get('video_id') or get_youtube_id(video_url)
-    if not video_id: return JsonResponse({'status': 'error', 'message': 'Valid YouTube URL or Video ID is required.'})
+    if not video_id:
+        return JsonResponse({'status': 'error', 'message': 'Valid YouTube URL or Video ID is required.'})
 
     task_id = str(uuid.uuid4())
 
     def long_running_task():
-        # This nested function's logic is mostly the same, but the progress hook is updated.
         def progress_hook(d):
             if d['status'] == 'downloading':
-                # Clean up the percentage string and send it back
                 percent_str = d.get('_percent_str', '0.0%')
                 cleaned_str = re.sub(r'\x1b\[[0-9;]*m', '', percent_str).replace('%', '').strip()
                 try:
@@ -110,7 +154,7 @@ def process_video(request):
                     cache.set(task_id,
                               {"status": "processing", "progress": progress, "message": "Downloading video..."})
                 except ValueError:
-                    pass  # Ignore if parsing fails
+                    pass
             elif d['status'] == 'finished':
                 cache.set(task_id,
                           {"status": "processing", "progress": 100, "message": "Download complete. Analyzing..."})
@@ -118,11 +162,13 @@ def process_video(request):
         try:
             video_record = DownloadedVideo.objects.get(video_id=video_id)
             if not video_record.suggestions or not isinstance(video_record.suggestions, list):
-                raise ValueError("Suggestions needed.")
+                # If suggestions are missing, regenerate them
+                raise ValueError("Suggestions are missing or invalid, regenerating.")
             cache.set(task_id, {"status": "processing", "progress": 100,
                                 "message": "Found existing video. Loading suggestions..."})
         except (DownloadedVideo.DoesNotExist, ValueError):
             try:
+                # Check if video file exists, otherwise download
                 video_full_path = os.path.join(settings.MEDIA_ROOT, 'videos', f'{video_id}.mp4')
                 if not os.path.exists(video_full_path):
                     if not video_url:
@@ -134,47 +180,103 @@ def process_video(request):
                     ydl_opts = {
                         'format': 'best[height<=1080][ext=mp4]',
                         'outtmpl': os.path.join(output_dir, f'{video_id}.%(ext)s'),
-                        'merge_output_format': 'mp4', 'noplaylist': True, 'writesubtitles': True,
+                        'merge_output_format': 'mp4',
+                        'noplaylist': True,
+                        'writesubtitles': True,
                         'writeautomaticsub': True,
-                        'subtitleslangs': ['en'], 'subtitlesformat': 'vtt', 'writethumbnail': True, 'nocolor': True,
+                        'subtitleslangs': ['en'],
+                        'subtitlesformat': 'vtt',
+                        'writethumbnail': True,
+                        'nocolor': True,
                         'progress_hooks': [progress_hook],
                     }
                     with YoutubeDL(ydl_opts) as ydl:
                         info = ydl.extract_info(video_url, download=True)
+
                     thumbnail_path = f'/media/videos/{video_id}.webp' if os.path.exists(
                         os.path.join(output_dir, f'{video_id}.webp')) else f'/media/videos/{video_id}.jpg'
-                    video_record, _ = DownloadedVideo.objects.update_or_create(
+
+                    video_record, created = DownloadedVideo.objects.update_or_create(
                         video_id=video_id,
-                        defaults={'title': info.get('title', 'N/A'), 'duration': info.get('duration', 0),
-                                  'file_path': f'/media/videos/{video_id}.mp4', 'thumbnail_path': thumbnail_path}
+                        defaults={
+                            'title': info.get('title', 'N/A'),
+                            'duration': info.get('duration', 0),
+                            'file_path': f'/media/videos/{video_id}.mp4',
+                            'thumbnail_path': thumbnail_path
+                        }
                     )
                 else:
+                    # If file exists, ensure DB record is present
                     video_record = get_object_or_404(DownloadedVideo, video_id=video_id)
+
+                # --- Suggestion Generation Logic ---
                 transcript_path = os.path.join(settings.MEDIA_ROOT, 'videos', f'{video_id}.en.vtt')
                 suggested_clips = []
                 if os.path.exists(transcript_path):
                     transcript = " ".join([c.text.strip().replace('\n', ' ') for c in webvtt.read(transcript_path)])
-                    if transcript: suggested_clips = get_ai_suggested_clips(transcript, video_record.duration)
+                    if transcript:
+                        # **THIS IS THE KEY FIX: Pass the video title for context**
+                        suggested_clips = get_ai_suggested_clips(transcript, video_record.duration, video_record.title)
+
                 video_record.suggestions = suggested_clips
                 video_record.save()
+
             except Exception as e:
+                logger.error(f"Error during video processing for {video_id}: {e}", exc_info=True)
                 cache.set(task_id, {'status': 'error', 'message': f'Processing failed: {e}'})
                 return
+
+        # Final step: set task as complete
         video_record = get_object_or_404(DownloadedVideo, video_id=video_id)
         cache.set(task_id, {'status': 'complete', 'result': {
-            'video_id': video_id, 'video_title': video_record.title, 'suggested_clips': video_record.suggestions,
+            'video_id': video_id,
+            'video_title': video_record.title,
+            'suggested_clips': video_record.suggestions,
         }})
 
     threading.Thread(target=long_running_task).start()
     return JsonResponse({'status': 'processing', 'task_id': task_id})
 
+def generate_social_post_content(clip_title: str, clip_description: str):
+    if not genai_configured or not genai:
+        logger.warning("Gemini AI not configured. Cannot generate social post.")
+        return None
 
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    prompt = f"""
+    You are a viral social media marketing expert. Your task is to create an engaging social media post for a short video clip.
+
+    **Clip Context:**
+    - **Title:** "{clip_title}"
+    - **Description:** "{clip_description}"
+
+    **Your Task:**
+    Generate the following content for a social media post (like for YouTube Shorts, Instagram Reels, or TikTok).
+
+    1.  `catchy_title`: A highly engaging and clickable title. Use emojis and keep it concise.
+    2.  `engaging_description`: A well-written description that hooks the viewer, explains the video's value, and includes a call-to-action (e.g., "Follow for more!", "What do you think? Comment below!"). Use emojis to break up the text and make it visually appealing.
+    3.  `hashtags`: A JSON array of 10-15 relevant and trending hashtags. Include a mix of broad and niche tags.
+
+    Your response MUST be a valid JSON object with the keys "catchy_title", "engaging_description", and "hashtags".
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        # Clean the response to ensure it's valid JSON
+        json_response_text = response.text.strip().replace("```json", "").replace("```", "")
+        return json.loads(json_response_text)
+    except Exception as e:
+        logger.error(f"Error generating social post content: {e}", exc_info=True)
+        return None # Return None on failure
+
+
+# --- UPDATED: generate_short Function ---
 def generate_short(request):
     if request.method != 'POST': return JsonResponse({'status': 'error', 'message': 'Invalid request method.'})
     try:
         data = json.loads(request.body)
-        video_id, clip_data, aspect_ratio = data.get('video_id'), data.get('clip_data', {}), data.get('aspect_ratio',
-                                                                                                      '9:16')
+        video_id, clip_data, aspect_ratio = data.get('video_id'), data.get('clip_data', {}), data.get('aspect_ratio', '9:16')
         start_time_str, end_time_str = clip_data.get('start_time'), clip_data.get('end_time')
         parent_video = get_object_or_404(DownloadedVideo, video_id=video_id)
         video_full_path = os.path.join(settings.BASE_DIR, parent_video.file_path.lstrip('/'))
@@ -201,28 +303,148 @@ def generate_short(request):
             os.makedirs(shorts_dir, exist_ok=True)
             short_uuid = uuid.uuid4()
 
-            # --- BUG FIX: SAVE AS PNG ---
-            # Saving as PNG resolves the "cannot write mode RGBA as JPEG" error
-            # because PNG supports the alpha (transparency) channel.
             short_filename = f'{short_uuid}.mp4'
             thumb_filename = f'{short_uuid}.png'
             short_path = os.path.join(shorts_dir, short_filename)
             thumb_path = os.path.join(shorts_dir, thumb_filename)
 
-            final_clip.write_videofile(short_path, codec="libx264", audio_codec="aac", threads=os.cpu_count(),
-                                       preset="medium")
+            final_clip.write_videofile(short_path, codec="libx264", audio_codec="aac", threads=os.cpu_count(), preset="medium")
             final_clip.save_frame(thumb_path, t=final_clip.duration / 2)
 
-        GeneratedShort.objects.create(
+        new_short = GeneratedShort.objects.create(
+            id=short_uuid,
             parent_video=parent_video, title=clip_data.get('title', 'Untitled Short'),
             description=clip_data.get('description', ''), tags=clip_data.get('tags', []),
             short_path=f'/media/shorts/{short_filename}', thumbnail_path=f'/media/shorts/{thumb_filename}',
             start_time=start_time_str, end_time=end_time_str
         )
-        return JsonResponse({'status': 'success', 'message': 'Short created successfully!'})
+        
+        # --- New: Call AI to generate social media content ---
+        social_post_content = generate_social_post_content(
+            clip_title=clip_data.get('title', 'Untitled Short'),
+            clip_description=clip_data.get('description', '')
+        )
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Short created successfully!',
+            'social_post': social_post_content,
+            'new_short_details': {
+                'id': str(new_short.id),
+                'title': new_short.title,
+                'description': new_short.description,
+                'thumbnail_path': new_short.thumbnail_path,
+                'short_path': new_short.short_path,
+                'download_url': f"/download_short/{os.path.basename(new_short.short_path)}/"
+            }
+        })
     except Exception as e:
         logger.error(f"Error during short generation: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
+
+def process_video(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid request.'})
+
+    video_url = request.POST.get('video_url')
+    video_id = request.POST.get('video_id') or get_youtube_id(video_url)
+    if not video_id:
+        return JsonResponse({'status': 'error', 'message': 'Valid YouTube URL or Video ID is required.'})
+
+    task_id = str(uuid.uuid4())
+
+    def long_running_task():
+        def progress_hook(d):
+            if d['status'] == 'downloading':
+                percent_str = d.get('_percent_str', '0.0%')
+                cleaned_str = re.sub(r'\x1b\[[0-9;]*m', '', percent_str).replace('%', '').strip()
+                try:
+                    progress = float(cleaned_str)
+                    cache.set(task_id,
+                              {"status": "processing", "progress": progress, "message": "Downloading video..."})
+                except ValueError:
+                    pass
+            elif d['status'] == 'finished':
+                cache.set(task_id,
+                          {"status": "processing", "progress": 100, "message": "Download complete. Analyzing..."})
+
+        try:
+            video_record = DownloadedVideo.objects.get(video_id=video_id)
+            if not video_record.suggestions or not isinstance(video_record.suggestions, list):
+                # If suggestions are missing, regenerate them
+                raise ValueError("Suggestions are missing or invalid, regenerating.")
+            cache.set(task_id, {"status": "processing", "progress": 100,
+                                "message": "Found existing video. Loading suggestions..."})
+        except (DownloadedVideo.DoesNotExist, ValueError):
+            try:
+                # Check if video file exists, otherwise download
+                video_full_path = os.path.join(settings.MEDIA_ROOT, 'videos', f'{video_id}.mp4')
+                if not os.path.exists(video_full_path):
+                    if not video_url:
+                        cache.set(task_id, {'status': 'error',
+                                            'message': f'Record for {video_id} not found and no URL provided.'})
+                        return
+                    output_dir = os.path.join(settings.MEDIA_ROOT, 'videos')
+                    os.makedirs(output_dir, exist_ok=True)
+                    ydl_opts = {
+                        'format': 'best[height<=1080][ext=mp4]',
+                        'outtmpl': os.path.join(output_dir, f'{video_id}.%(ext)s'),
+                        'merge_output_format': 'mp4',
+                        'noplaylist': True,
+                        'writesubtitles': True,
+                        'writeautomaticsub': True,
+                        'subtitleslangs': ['en'],
+                        'subtitlesformat': 'vtt',
+                        'writethumbnail': True,
+                        'nocolor': True,
+                        'progress_hooks': [progress_hook],
+                    }
+                    with YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(video_url, download=True)
+
+                    thumbnail_path = f'/media/videos/{video_id}.webp' if os.path.exists(
+                        os.path.join(output_dir, f'{video_id}.webp')) else f'/media/videos/{video_id}.jpg'
+
+                    video_record, created = DownloadedVideo.objects.update_or_create(
+                        video_id=video_id,
+                        defaults={
+                            'title': info.get('title', 'N/A'),
+                            'duration': info.get('duration', 0),
+                            'file_path': f'/media/videos/{video_id}.mp4',
+                            'thumbnail_path': thumbnail_path
+                        }
+                    )
+                else:
+                    # If file exists, ensure DB record is present
+                    video_record = get_object_or_404(DownloadedVideo, video_id=video_id)
+
+                # --- Suggestion Generation Logic ---
+                transcript_path = os.path.join(settings.MEDIA_ROOT, 'videos', f'{video_id}.en.vtt')
+                suggested_clips = []
+                if os.path.exists(transcript_path):
+                    transcript = " ".join([c.text.strip().replace('\n', ' ') for c in webvtt.read(transcript_path)])
+                    if transcript:
+                        # **THIS IS THE KEY FIX: Pass the video title for context**
+                        suggested_clips = get_ai_suggested_clips(transcript, video_record.duration, video_record.title)
+
+                video_record.suggestions = suggested_clips
+                video_record.save()
+
+            except Exception as e:
+                logger.error(f"Error during video processing for {video_id}: {e}", exc_info=True)
+                cache.set(task_id, {'status': 'error', 'message': f'Processing failed: {e}'})
+                return
+
+        # Final step: set task as complete
+        video_record = get_object_or_404(DownloadedVideo, video_id=video_id)
+        cache.set(task_id, {'status': 'complete', 'result': {
+            'video_id': video_id,
+            'video_title': video_record.title,
+            'suggested_clips': video_record.suggestions,
+        }})
+
+    threading.Thread(target=long_running_task).start()
+    return JsonResponse({'status': 'processing', 'task_id': task_id})
 
 
 # --- New: YouTube Trending Videos API ---
@@ -306,6 +528,7 @@ def get_trending_videos(request):
     except Exception as e:
         logger.error(f"An unexpected error occurred while fetching trending videos: {e}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {e}'}, status=500)
+
 
 
 # --- Deletion and Download views (Unchanged) ---
